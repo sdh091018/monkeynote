@@ -67,17 +67,19 @@
   #titleBtn { background: none; font-weight: 600; max-width: 180px; white-space: nowrap;
               overflow: hidden; text-overflow: ellipsis; }
   #penBtn { min-width: 80px; }
-  #penMenu, #eraserMenu { position: fixed; z-index: 60; width: 240px; background: #fff; border-radius: 12px; padding: 6px;
+  #penMenu, #eraserMenu, #shapeMenu { position: fixed; z-index: 60; width: 240px; background: #fff; border-radius: 12px; padding: 6px;
              box-shadow: 0 8px 30px rgba(0,0,0,.2); display: flex; flex-direction: column; gap: 2px; }
-  #penMenu button, #eraserMenu button { display: flex; align-items: center; gap: 10px; background: none;
+  #penMenu button, #eraserMenu button, #shapeMenu button { display: flex; align-items: center; gap: 10px; background: none;
              text-align: left; padding: 8px 10px; color: #111; }
-  #penMenu button.active, #eraserMenu button.active { background: #e8f0ff; }
-  #penMenu canvas { position: static; width: 64px; height: 24px; flex: none; }
+  #penMenu button.active, #eraserMenu button.active, #shapeMenu button.active { background: #e8f0ff; }
+  #penMenu canvas, #shapeMenu canvas { position: static; width: 64px; height: 24px; flex: none; }
   .pl { display: flex; flex-direction: column; }
   .pd { font-size: 12px; color: #888; }
   #eraserCursor { position: fixed; z-index: 55; pointer-events: none; border-radius: 50%;
                   border: 1.5px solid rgba(0,0,0,.55); background: rgba(255,255,255,.35);
                   box-shadow: 0 0 0 1px rgba(255,255,255,.8); transform: translate(-50%, -50%); }
+  #zoomBtn { position: fixed; z-index: 20; left: 16px; bottom: calc(env(safe-area-inset-bottom) + 16px);
+             background: rgba(0,0,0,.6); color: #fff; font-size: 14px; padding: 6px 12px; border-radius: 14px; }
   #textEdit { position: fixed; z-index: 58; margin: 0; padding: 0; border: 0; border-radius: 0;
               outline: 1.5px dashed #007aff; outline-offset: 4px; background: rgba(255,255,255,.55);
               resize: none; overflow: hidden; line-height: 1.4; white-space: pre-wrap;
@@ -148,6 +150,15 @@
   #busy { position: fixed; inset: 0; z-index: 200; background: rgba(255,255,255,.75);
           display: flex; align-items: center; justify-content: center; font-size: 17px; color: #333;
           padding: 20px; text-align: center; white-space: pre-line; }
+
+  /* v1.9.0 자 */
+  #ruler { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; transform-origin: 50% 50%;
+           background: rgba(250,250,252,.85); border-radius: 4px;
+           box-shadow: 0 0 0 1px rgba(0,0,0,.25), 0 2px 10px rgba(0,0,0,.18); }
+  #view #ruler canvas { position: static; inset: auto; display: block; }
+  #rulerDeg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+              font-size: 13px; font-weight: 600; color: #333; background: #fff;
+              border-radius: 10px; padding: 2px 8px; box-shadow: 0 0 0 1px #ccc; }
 </style>
 </head>
 <body>
@@ -193,6 +204,8 @@
     <button data-tool="highlighter">형광펜</button>
     <button id="eraserBtn">지우개 ▾</button>
     <button data-tool="text">텍스트</button>
+    <button id="shapeBtn">도형 ▾</button>
+    <button id="rulerBtn" title="자">📏 자</button>
     <div class="sep"></div>
     <div id="palette"></div>
     <label class="color picker" id="pickerBtn"><input type="color" id="picker"></label>
@@ -214,12 +227,15 @@
     <canvas id="base"></canvas>
     <canvas id="live"></canvas>
     <div id="pageInfo"></div>
+    <div id="ruler" hidden><canvas id="rulerCv"></canvas><span id="rulerDeg"></span></div>
   </div>
 </div>
 
 <div id="penMenu" hidden></div>
 <div id="eraserMenu" hidden></div>
+<div id="shapeMenu" hidden></div>
 <div id="eraserCursor" hidden></div>
+<button id="zoomBtn" hidden></button>
 <textarea id="textEdit" hidden spellcheck="false" autocomplete="off"></textarea>
 <div id="textBar" hidden>
   <button id="textDel" class="danger">삭제</button>
@@ -258,9 +274,8 @@
       <li><a href="https://github.com/jakearchibald/idb-keyval" target="_blank" rel="noopener">idb-keyval</a> — Apache License 2.0</li>
       <li><a href="https://github.com/VolodymyrBaydalka/docxjs" target="_blank" rel="noopener">docx-preview</a> — Apache License 2.0</li>
       <li><a href="https://github.com/niklasvh/html2canvas" target="_blank" rel="noopener">html2canvas</a> — MIT License</li>
-      <!-- 아래 두 개는 각 저장소의 LICENSE 파일을 확인해서 라이선스 이름을 적어 주세요 -->
-      <li><a href="https://github.com/Stuk/jszip" target="_blank" rel="noopener">JSZip</a> — 라이선스는 저장소 참고</li>
-      <li><a href="https://github.com/mwilliamson/mammoth.js" target="_blank" rel="noopener">mammoth.js</a> — 라이선스는 저장소 참고</li>
+      <li><a href="https://github.com/Stuk/jszip" target="_blank" rel="noopener">JSZip</a> — MIT License</li>
+      <li><a href="https://github.com/mwilliamson/mammoth.js" target="_blank" rel="noopener">mammoth.js</a> — BSD 2-Clause License</li>
     </ul>
     <p>각 라이선스 전문은 링크한 저장소의 LICENSE 파일에서 볼 수 있어요.</p>
     <div class="row"><button id="aboutClose" class="primary">닫기</button></div>
@@ -289,7 +304,7 @@
 
 <script type="module">
 // ===== 버전: 올릴 때마다 바꾸세요 (version.json을 쓰면 그 숫자와 똑같이) =====
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.9.0';
 // ========================================================================
 
 import { getStroke } from 'https://esm.sh/perfect-freehand@1';
@@ -355,8 +370,9 @@ const PAGE_W = 820, BLANK_H = Math.round(PAGE_W * 1.414), GAP = 24, LINE = 32;
 const A4 = [595.28, 841.89];
 const TRASH_DAYS = 30, DAY = 86400000;
 const SETTINGS_KEY = 'note-settings', COLORS_KEY = 'note-colors', PEN_KEY = 'note-pen',
-      FOLDER_KEY = 'note-folder', BACKUP_KEY = 'note-last-backup', ERASER_MODE_KEY = 'note-eraser-mode';
-const SETTING_KEYS = [SETTINGS_KEY, COLORS_KEY, PEN_KEY, ERASER_MODE_KEY];   // 백업에 포함되는 설정
+      FOLDER_KEY = 'note-folder', BACKUP_KEY = 'note-last-backup', ERASER_MODE_KEY = 'note-eraser-mode',
+      SHAPE_KEY = 'note-shape';
+const SETTING_KEYS = [SETTINGS_KEY, COLORS_KEY, PEN_KEY, ERASER_MODE_KEY, SHAPE_KEY];   // 백업에 포함되는 설정
 const BACKUP_APP = 'my-notes-backup';
 const $ = id => document.getElementById(id);
 
@@ -366,6 +382,7 @@ const view = $('view'), base = $('base'), live = $('live'), pageInfo = $('pageIn
 const titleBtn = $('titleBtn');
 const penBtn = $('penBtn'), penMenu = $('penMenu');
 const eraserBtn = $('eraserBtn'), eraserMenu = $('eraserMenu'), eCursor = $('eraserCursor');
+const shapeBtn = $('shapeBtn'), shapeMenu = $('shapeMenu'), zoomBtn = $('zoomBtn');
 const textArea = $('textEdit'), textBar = $('textBar'), selBar = $('selBar');
 const bctx = base.getContext('2d'), lctx = live.getContext('2d');
 
@@ -391,6 +408,16 @@ const ERASER_MODES = {
   partial: { label: '부분 지우개', desc: '지나간 부분만 지워요' },
   stroke:  { label: '획 지우개',   desc: '닿은 선을 통째로 지워요' },
 };
+const SHAPE_RANGE = [1, 20];
+const SHAPES = {
+  line:   { label: '직선',   desc: '가로·세로·45°에 가까우면 맞춰져요', n: 0 },
+  circle: { label: '원',     desc: '정원에 가까우면 맞춰져요',          n: 72 },
+  tri:    { label: '삼각형', desc: '반듯한 모양에 가까우면 맞춰져요',    n: 3 },
+  rect:   { label: '사각형', desc: '정사각형에 가까우면 맞춰져요',       n: 4 },
+  penta:  { label: '오각형', desc: '반듯한 모양에 가까우면 맞춰져요',    n: 5 },
+  hexa:   { label: '육각형', desc: '반듯한 모양에 가까우면 맞춰져요',    n: 6 },
+};
+const ZOOM_RANGE = [0.5, 4];
 const TEXT_RANGE = [12, 72];
 const TEXT_FONT = '-apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
 const TEXT_LH = 1.4;
@@ -400,8 +427,9 @@ const MAX_CUSTOM = 6;
 const toolOf = s => TOOLS[s.tool] || TOOLS.pen;
 const isPen = t => PEN_KINDS.includes(t);
 const isText = s => s.type === 'text';
+const isShape = s => s.type === 'shape';
 
-const sizes = { eraser: 16, text: 24,
+const sizes = { eraser: 16, text: 24, shape: 3,
                 ...Object.fromEntries(Object.entries(TOOLS).map(([k, t]) => [k, t.size])),
                 ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') };
 const colorData = { current: PRESETS[0], custom: [],
@@ -411,12 +439,13 @@ let notesIndex = [];               // [{ id, title, updated, pageCount, hasPdf, 
 let folders = [];                  // [{ id, name, parent, created, trashed }]
 let currentFolder = null, trashMode = false;
 let note = null;
-let strokes = [], tops = [], docH = 0;   // strokes에는 펜 선과 텍스트 상자(type: 'text')가 함께 들어감
+let strokes = [], tops = [], docH = 0;   // strokes에는 펜 선·도형(type: 'shape')·텍스트 상자(type: 'text')가 함께 들어감
 let pdfDoc = null;
 let history = [], redoStack = [];  // 실행취소용 (브라우저 기록은 window.history)
 let lastPen = isPen(localStorage.getItem(PEN_KEY)) ? localStorage.getItem(PEN_KEY) : 'pen';
 let tool = lastPen, color = colorData.current, fingerMode = false;
 let eraserMode = localStorage.getItem(ERASER_MODE_KEY) === 'stroke' ? 'stroke' : 'partial';
+let shapeKind = SHAPES[localStorage.getItem(SHAPE_KEY)] ? localStorage.getItem(SHAPE_KEY) : 'line';
 let drawing = null, erasing = null;
 let textDrag = null, textEdit = null, swallowId = null;
 let selText = null, selEdit = null;       // 선택된 텍스트 상자 / 색·크기를 바꾸는 중인 기록
@@ -1281,13 +1310,14 @@ async function openNote(id) {
     note = n; strokes = n.strokes || []; pdfDoc = doc;
     history = []; redoStack = []; drawing = erasing = null; textDrag = textEdit = null;
     selText = selEdit = null; selBar.hidden = true;
-    scrollY = 0; dirty = false;
+    scrollY = 0; zoom = 1; offsetX = 0; dirty = false;
     computeTops();
     titleBtn.textContent = n.title;
     $('back').textContent = '‹ ' + (folderOf(currentFolder)?.name || '목록');
     library.hidden = true; editor.hidden = false;
     hideBusy();
     resize();
+    updateZoomBtn();
     // 안드로이드 뒤로가기용 기록. 지난번 기록이 남아 있으면 쌓지 않고 재사용
     try {
       if (window.history.state?.editor) window.history.replaceState({ editor: true }, '');
@@ -1309,7 +1339,7 @@ async function closeNote() {
     cancelTextDrag();
     clearSel();
     stopInertia();
-    penMenu.hidden = eraserMenu.hidden = eCursor.hidden = true;
+    penMenu.hidden = eraserMenu.hidden = shapeMenu.hidden = eCursor.hidden = true;
     drawing = erasing = null;
     try {
       await flushSave();
@@ -1324,6 +1354,7 @@ async function closeNote() {
     freePdf();
     note = null; strokes = [];
     editor.hidden = true; library.hidden = false;
+    zoomBtn.hidden = true;
     renderLibrary();
   } finally {
     closing = false;
@@ -1355,6 +1386,7 @@ titleBtn.onclick = () => note && renameNote(note.id);
 // ---------- PDF 페이지 렌더링 (보이는 페이지만, 최대 4장 캐시) ----------
 const pdfCache = new Map();
 const pending = new Set();
+const PDF_PIXELS = 24e6;   // 캐시 전체 픽셀 한도 (아이패드 메모리 보호)
 
 function freePdf() {
   for (const c of pdfCache.values()) c.canvas.width = 0;
@@ -1363,11 +1395,21 @@ function freePdf() {
   pdfDoc = null;
 }
 
+// 확대해도 페이지 한 장이 너무 커지지 않도록 해상도 상한
+const maxRes = i => Math.min(4, Math.sqrt(12e6 / (PAGE_W * note.pages[i].h)));
+const zoomSettled = () => performance.now() - lastZoomT > 250;
+function cachePixels() {
+  let n = 0;
+  for (const c of pdfCache.values()) n += c.canvas.width * c.canvas.height;
+  return n;
+}
+
 function getPdfBitmap(i) {
-  const want = Math.min(scale * dpr, 2.5);
+  const want = Math.min(scale * dpr, maxRes(i));
   const c = pdfCache.get(i);
   if (c) { pdfCache.delete(i); pdfCache.set(i, c); }
-  if ((!c || c.res < want * 0.98) && !pending.has(i) && pdfDoc) {
+  // 확대·축소하는 동안에는 있는 그림을 늘려 쓰고, 멈추면 선명하게 다시 그림
+  if ((!c || (c.res < want * 0.98 && zoomSettled())) && !pending.has(i) && pdfDoc) {
     renderPdfPage(i, note.pages[i].pdf, want);
   }
   return c ? c.canvas : null;
@@ -1387,7 +1429,7 @@ async function renderPdfPage(i, pageNum, res) {
     const old = pdfCache.get(i);
     if (old) { old.canvas.width = 0; pdfCache.delete(i); }
     pdfCache.set(i, { canvas, res });
-    while (pdfCache.size > 4) {
+    while (pdfCache.size > 4 || (pdfCache.size > 1 && cachePixels() > PDF_PIXELS)) {
       const k = pdfCache.keys().next().value;
       pdfCache.get(k).canvas.width = 0;
       pdfCache.delete(k);
@@ -1402,6 +1444,7 @@ async function renderPdfPage(i, pageNum, res) {
 
 // ---------- 뷰 (스크롤/배율) ----------
 let dpr = 1, viewW = 0, viewH = 0, scale = 1, offsetX = 0, scrollY = 0;
+let baseScale = 1, zoom = 1, lastZoomT = 0, zoomTimer = 0;   // scale = baseScale(화면 폭 맞춤) × zoom
 
 function computeTops() {
   tops = []; let y = GAP;
@@ -1417,13 +1460,60 @@ function setScroll(y) {
   placeSel();
 }
 
+// 가로 위치: 페이지가 화면보다 좁으면 가운데, 넓으면 끝까지만 이동
+function clampX() {
+  const w = PAGE_W * scale;
+  if (w + 32 <= viewW) offsetX = (viewW - w) / 2;
+  else offsetX = Math.min(16, Math.max(viewW - w - 16, offsetX));
+}
+
+function panBy(dx, dy) {
+  offsetX += dx;
+  clampX();
+  setScroll(scrollY - dy / scale);
+}
+
+// 문서의 (ax, ay) 지점이 화면의 (sx, sy)에 오도록 배율 z 적용
+function zoomTo(z, ax, ay, sx, sy) {
+  z = Math.min(ZOOM_RANGE[1], Math.max(ZOOM_RANGE[0], z));
+  if (Math.abs(z - 1) < 0.04) z = 1;   // 100% 근처에서는 딱 맞춤
+  zoom = z;
+  const r = view.getBoundingClientRect();
+  scale = baseScale * zoom;
+  offsetX = sx - r.left - ax * scale;
+  clampX();
+  lastZoomT = performance.now();
+  clearTimeout(zoomTimer);
+  zoomTimer = setTimeout(() => requestRender(true), 300);
+  updateZoomBtn();
+  setScroll(ay - (sy - r.top) / scale);
+}
+function zoomAt(z, sx, sy) {
+  const r = view.getBoundingClientRect();
+  zoomTo(z, (sx - r.left - offsetX) / scale, (sy - r.top) / scale + scrollY, sx, sy);
+}
+function zoomCenter(z) {
+  const r = view.getBoundingClientRect();
+  zoomAt(z, r.left + r.width / 2, r.top + r.height / 2);
+}
+function updateZoomBtn() {
+  rulerRedraw();
+  zoomBtn.hidden = editor.hidden || zoom === 1;
+  zoomBtn.textContent = Math.round(zoom * 100) + '%  ↺';
+}
+zoomBtn.onclick = () => zoomCenter(1);
+
 function resize() {
   if (editor.hidden) return;
   dpr = window.devicePixelRatio || 1;
   const r = view.getBoundingClientRect();
+  const left = -offsetX / scale;   // 화면 왼쪽 끝의 문서 위치 (화면 크기가 바뀌어도 유지)
   viewW = r.width; viewH = r.height;
-  scale = Math.min(1.3, (viewW - 32) / PAGE_W);
-  offsetX = (viewW - PAGE_W * scale) / 2;
+  baseScale = Math.min(1.3, (viewW - 32) / PAGE_W);
+  rulerFit();
+  scale = baseScale * zoom;
+  offsetX = -left * scale;
+  clampX();
   for (const c of [base, live]) {
     c.width = Math.round(viewW * dpr);
     c.height = Math.round(viewH * dpr);
@@ -1519,6 +1609,7 @@ function grainFill(ctx, c) {
 }
 
 function drawStroke(ctx, s) {
+  if (isShape(s)) return drawShape(ctx, s);
   const p = toPath(s);
   if (!p) return;
   const T = toolOf(s);
@@ -1528,7 +1619,7 @@ function drawStroke(ctx, s) {
   ctx.globalAlpha = 1;
 }
 
-// 그리는 순서: 형광펜 → 텍스트 → 펜
+// 그리는 순서: 형광펜 → 텍스트 → 펜·도형
 function drawStrokes(ctx, arr) {
   for (const s of arr) if (s.tool === 'highlighter') drawStroke(ctx, s);
   for (const s of arr) if (isText(s)) drawText(ctx, s);
@@ -1606,10 +1697,12 @@ function redo() {
 }
 
 // ---------- 필기 ----------
-function toDoc(e) {
+function toDoc(e, snapSize) {
   const r = view.getBoundingClientRect();
-  const x = (e.clientX - r.left - offsetX) / scale;
-  const y = (e.clientY - r.top) / scale + scrollY;
+  let vx = e.clientX - r.left, vy = e.clientY - r.top;
+  if (snapSize && rulerLock) [vx, vy] = rulerSnap(vx, vy, snapSize);   // 자 가장자리에 붙이기
+  const x = (vx - offsetX) / scale;
+  const y = vy / scale + scrollY;
   const p = e.pressure > 0 ? e.pressure : 0.5;
   return [rnd(x), rnd(y), Math.round(p * 100) / 100];
 }
@@ -1689,6 +1782,74 @@ function eraseTo(pt) {
     erase([last[0] + (pt[0] - last[0]) * i / n, last[1] + (pt[1] - last[1]) * i / n]);
   }
   erasing.last = pt;
+}
+
+// ---------- 도형 ----------
+// 도형은 꼭짓점을 이은 선(points)으로 저장 → 지우개·실행취소·PDF 저장이 펜 선과 똑같이 동작
+const unitCache = new Map();
+function unitShape(n) {
+  let u = unitCache.get(n);
+  if (!u) {
+    // 삼각형·오각형은 꼭짓점이 위로, 사각형·육각형은 윗변이 평평하게
+    const off = n > 6 ? 0 : -Math.PI / 2 + (n % 2 ? 0 : Math.PI / n);
+    const pts = Array.from({ length: n }, (_, k) =>
+      [Math.cos(off + 2 * Math.PI * k / n), Math.sin(off + 2 * Math.PI * k / n)]);
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    u = { pts, minx: Math.min(...xs), miny: Math.min(...ys) };
+    u.w = Math.max(...xs) - u.minx;
+    u.h = Math.max(...ys) - u.miny;
+    unitCache.set(n, u);
+  }
+  return u;
+}
+
+// a: 누른 곳, b: 지금 위치 (문서 좌표). force: 항상 반듯하게 (PC Shift)
+function shapePoints(kind, a, b, force) {
+  if (kind === 'line') {
+    let x = b[0], y = b[1];
+    const dx = x - a[0], dy = y - a[1], len = Math.hypot(dx, dy);
+    const ang = Math.atan2(dy, dx), step = Math.PI / 4, snap = Math.round(ang / step) * step;
+    if (force || Math.abs(ang - snap) < 0.09) {   // 가로·세로·45°에서 5° 이내면 맞춤
+      x = a[0] + Math.cos(snap) * len;
+      y = a[1] + Math.sin(snap) * len;
+    }
+    return [[a[0], a[1]], [rnd(x), rnd(y)]];
+  }
+  const u = unitShape(SHAPES[kind].n);
+  const w = b[0] - a[0], h = b[1] - a[1], ratio = u.h / u.w;
+  let aw = Math.abs(w), ah = Math.abs(h);
+  // 반듯한 모양(정원·정다각형) 비율에 10% 이내로 가까우면 맞춤
+  if (aw > 0 && ah > 0 && (force || Math.abs(ah / aw - ratio) / ratio < 0.1)) {
+    const s = Math.max(aw, ah / ratio);
+    aw = s; ah = s * ratio;
+  }
+  const x0 = w < 0 ? a[0] - aw : a[0], y0 = h < 0 ? a[1] - ah : a[1];
+  const pts = u.pts.map(([ux, uy]) =>
+    [rnd(x0 + (ux - u.minx) / u.w * aw), rnd(y0 + (uy - u.miny) / u.h * ah)]);
+  pts.push(pts[0]);   // 닫힌 도형
+  return pts;
+}
+
+function drawShape(ctx, s) {
+  const p = s.points;
+  if (!p || p.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(p[0][0], p[0][1]);
+  for (let i = 1; i < p.length; i++) ctx.lineTo(p[i][0], p[i][1]);
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = s.size;
+  ctx.lineCap = ctx.lineJoin = 'round';
+  ctx.strokeStyle = s.color;
+  ctx.stroke();
+}
+
+function shapeBigEnough(s) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of s.points) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return Math.max(x1 - x0, y1 - y0) >= 4;
 }
 
 // ---------- 텍스트 상자 ----------
@@ -1922,7 +2083,7 @@ function endTextDrag(cancelled) {
 
 function openTextEdit(t, isNew) {
   clearSel();
-  penMenu.hidden = eraserMenu.hidden = true;
+  penMenu.hidden = eraserMenu.hidden = shapeMenu.hidden = true;
   textEdit = { orig: isNew ? null : t, cur: { ...t }, before: strokes };
   textArea.value = t.text;
   textArea.style.fontFamily = TEXT_FONT;
@@ -1981,9 +2142,7 @@ document.addEventListener('pointerdown', e => {
   if (!textEdit || e.target.closest('#textEdit, #textBar, #palette, #pickerBtn, #sizeBox')) return;
   if (view.contains(e.target)) swallowId = e.pointerId;   // 이 탭은 '입력 마침'으로만 쓰임
   finishTextEdit();
-}, true);
-
-function moveCursor(e) {
+}, true); function moveCursor(e) {
   if (tool !== 'eraser' || (e.pointerType === 'touch' && !fingerMode)) { eCursor.hidden = true; return; }
   const d = sizes.eraser;
   Object.assign(eCursor.style, { left: e.clientX + 'px', top: e.clientY + 'px', width: d + 'px', height: d + 'px' });
@@ -1997,9 +2156,15 @@ function startInk(e) {
     const pt = toDoc(e);
     erasing = { id: e.pointerId, before: strokes, last: pt };
     erase(pt);
+  } else if (tool === 'shape') {
+    const [x, y] = toDoc(e);
+    drawing = { id: e.pointerId, type: 'shape', kind: shapeKind, color, size: sizes.shape,
+                start: [x, y], points: [[x, y]] };
+    requestRender();
   } else {
+    rulerBegin(e);
     drawing = { id: e.pointerId, tool, color, size: sizes[tool],
-                points: [toDoc(e)], simulate: e.pointerType !== 'pen' };
+                points: [toDoc(e, sizes[tool])], simulate: e.pointerType !== 'pen' };
     requestRender();
   }
 }
@@ -2008,6 +2173,10 @@ function finishInk() {
   if (drawing) {
     const s = drawing; drawing = null;
     delete s.id;
+    if (isShape(s)) {
+      delete s.start;
+      if (!shapeBigEnough(s)) { requestRender(); return; }   // 너무 작으면 그냥 버림 (톡 누른 경우)
+    }
     const prev = strokes;
     strokes = [...strokes, s];
     commit(prev);
@@ -2023,14 +2192,205 @@ function cancelInk() {
   else if (erasing) finishInk();
 }
 
-// ---------- 스크롤 (손가락 드래그 + 관성) ----------
-const touches = new Map();
-let pan = null, tap = null, inertiaRaf = 0;
+// ---------- 자 (v1.9.0) ----------
+// 화면에 고정된 자. 노트에는 저장되지 않고, 펜·형광펜 선만 가장자리에 붙여 줌
+const rulerEl = $('ruler'), rulerCv = $('rulerCv'), rulerDeg = $('rulerDeg'), rulerBtn = $('rulerBtn');
+const RULER_H = 72, RULER_SNAP = 28;   // 자 두께, 가장자리에 붙는 거리 (화면 px)
+const MM = PAGE_W / 210;               // 문서 좌표 1mm (A4 폭 210mm 기준)
+let rulerOn = false, rulerPlaced = false, rulerL = 0, rcx = 0, rcy = 0, ra = 0, rulerRaf = 0;
+let rulerG = null, rulerMouse = null, rulerLock = 0;   // rulerLock: -1 윗변, 1 아랫변, 0 안 붙음
+const rulerTouch = new Map();
 
-function avgY() {
-  let sum = 0;
-  for (const y of touches.values()) sum += y;
-  return sum / touches.size;
+function viewPt(e) {
+  const r = view.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+function rulerLocal(x, y) {
+  const dx = x - rcx, dy = y - rcy, c = Math.cos(ra), s = Math.sin(ra);
+  return { u: dx * c + dy * s, v: -dx * s + dy * c };
+}
+function onRuler(e) {
+  if (!rulerOn) return false;
+  const p = viewPt(e), q = rulerLocal(p.x, p.y);
+  return Math.abs(q.u) <= rulerL / 2 && Math.abs(q.v) <= RULER_H / 2;
+}
+const snapRA = a => {   // 0°·45°·90°… 에서 2° 이내면 딱 맞춤
+  const st = Math.PI / 4, n = Math.round(a / st);
+  return Math.abs(a - n * st) < Math.PI / 90 ? n * st : a;
+};
+function clampRuler() {
+  rcx = Math.min(Math.max(rcx, 20), Math.max(20, viewW - 20));
+  rcy = Math.min(Math.max(rcy, 20), Math.max(20, viewH - 20));
+}
+
+function placeRuler() {
+  rulerEl.style.transform = `translate(${rcx - rulerL / 2}px, ${rcy - RULER_H / 2}px) rotate(${ra}rad)`;
+  let deg = Math.round(((ra * 180 / Math.PI) % 180 + 180) % 180);
+  if (deg > 90) deg = 180 - deg;
+  rulerDeg.textContent = deg + '°';
+}
+
+function drawRuler() {
+  rulerRaf = 0;
+  if (!rulerOn) return;
+  const d = dpr, L = rulerL, H = RULER_H;
+  rulerEl.style.width = L + 'px'; rulerEl.style.height = H + 'px';
+  rulerCv.style.width = L + 'px'; rulerCv.style.height = H + 'px';
+  const W = Math.round(L * d), Hp = Math.round(H * d);
+  if (rulerCv.width !== W || rulerCv.height !== Hp) { rulerCv.width = W; rulerCv.height = Hp; }
+  const c = rulerCv.getContext('2d');
+  c.setTransform(d, 0, 0, d, 0, 0);
+  c.clearRect(0, 0, L, H);
+  const mm = MM * scale;                                  // 화면에서 1mm 간격
+  const step = mm >= 4 ? 1 : mm * 5 >= 8 ? 5 : 10;        // 너무 촘촘하면 눈금을 건너뜀
+  c.strokeStyle = '#555'; c.lineWidth = 1;
+  c.beginPath();
+  for (let i = 0; 12 + i * mm <= L; i += step) {
+    const x = Math.round(12 + i * mm) + 0.5;
+    const len = i % 10 === 0 ? 18 : i % 5 === 0 ? 12 : 7;
+    c.moveTo(x, 0); c.lineTo(x, len);
+    c.moveTo(x, H); c.lineTo(x, H - len);
+  }
+  c.stroke();
+  c.fillStyle = '#444'; c.font = '11px -apple-system, sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  const every = mm * 10 >= 24 ? 1 : 5;
+  for (let cm = 0; 12 + cm * 10 * mm <= L; cm += every) c.fillText(cm, 12 + cm * 10 * mm, 28);
+  placeRuler();
+}
+function rulerRedraw() { if (rulerOn && !rulerRaf) rulerRaf = requestAnimationFrame(drawRuler); }
+
+// 화면 크기가 바뀌면 자 길이·위치 맞춤 (어떤 각도에서도 화면을 가로지르는 길이)
+function rulerFit() {
+  if (!rulerOn) return;
+  rulerL = Math.ceil(Math.hypot(viewW, viewH)) + 40;
+  clampRuler();
+  rulerRedraw();
+}
+
+function toggleRuler() {
+  rulerOn = !rulerOn;
+  rulerBtn.classList.toggle('active', rulerOn);
+  rulerEl.hidden = !rulerOn;
+  rulerG = rulerMouse = null; rulerTouch.clear();
+  if (!rulerOn) return;
+  if (!rulerPlaced) { rcx = viewW / 2; rcy = viewH * 0.45; ra = 0; rulerPlaced = true; }
+  rulerFit();
+}
+rulerBtn.onclick = toggleRuler;
+
+// 손가락 수가 바뀔 때마다 기준을 새로 잡음
+function rulerStart() {
+  rulerG = { pts: [...rulerTouch.values()].slice(0, 2).map(p => ({ ...p })), cx0: rcx, cy0: rcy, a0: ra };
+}
+
+// true를 돌려주면 자가 이 입력을 가져감 (필기·스크롤 안 함)
+function rulerDown(e) {
+  if (!rulerOn) return false;
+  if (e.pointerType === 'touch') {
+    if (!rulerG && !onRuler(e)) return false;
+    if (drawing || erasing) return true;   // 필기 중 자에 닿은 손바닥·손가락은 무시 (자 누르고 긋기)
+    rulerTouch.set(e.pointerId, viewPt(e));
+    rulerStart();
+    return true;
+  }
+  if (e.pointerType === 'mouse' && onRuler(e)) {   // 마우스: 자 가운데를 끌면 이동, 가장자리는 필기
+    const p = viewPt(e), q = rulerLocal(p.x, p.y);
+    if (Math.abs(q.v) < RULER_H / 2 - 14) {
+      view.setPointerCapture(e.pointerId);
+      rulerMouse = { id: e.pointerId, sx: p.x, sy: p.y, cx0: rcx, cy0: rcy };
+      return true;
+    }
+  }
+  return false;   // 펜슬은 자 위에서도 필기
+}
+
+function rulerMove(e) {
+  if (rulerMouse && e.pointerId === rulerMouse.id) {
+    const p = viewPt(e);
+    rcx = rulerMouse.cx0 + p.x - rulerMouse.sx;
+    rcy = rulerMouse.cy0 + p.y - rulerMouse.sy;
+    clampRuler(); placeRuler();
+    return true;
+  }
+  if (!rulerTouch.has(e.pointerId) || !rulerG) return false;
+  rulerTouch.set(e.pointerId, viewPt(e));
+  const g = rulerG, s = g.pts, now = [...rulerTouch.values()].slice(0, 2);
+  if (now.length < 2 || s.length < 2) {          // 한 손가락: 이동
+    rcx = g.cx0 + now[0].x - s[0].x;
+    rcy = g.cy0 + now[0].y - s[0].y;
+  } else {                                       // 두 손가락: 회전 + 이동
+    const m0 = { x: (s[0].x + s[1].x) / 2, y: (s[0].y + s[1].y) / 2 };
+    const m = { x: (now[0].x + now[1].x) / 2, y: (now[0].y + now[1].y) / 2 };
+    const na = snapRA(g.a0 + Math.atan2(now[1].y - now[0].y, now[1].x - now[0].x)
+                           - Math.atan2(s[1].y - s[0].y, s[1].x - s[0].x));
+    const da = na - g.a0, c = Math.cos(da), sn = Math.sin(da);
+    const dx = g.cx0 - m0.x, dy = g.cy0 - m0.y;
+    rcx = m.x + dx * c - dy * sn;
+    rcy = m.y + dx * sn + dy * c;
+    ra = na;
+  }
+  clampRuler(); placeRuler();
+  return true;
+}
+
+function rulerUp(e) {
+  if (rulerMouse && e.pointerId === rulerMouse.id) { rulerMouse = null; return true; }
+  if (!rulerTouch.has(e.pointerId)) return false;
+  rulerTouch.delete(e.pointerId);
+  if (rulerTouch.size) rulerStart(); else rulerG = null;
+  return true;
+}
+
+// PC: 자 위에서 휠 = 1°, Shift+휠 = 15° 회전 (마우스 위치 기준)
+function rulerWheel(e) {
+  if (!onRuler(e)) return false;
+  const step = (e.shiftKey ? 15 : 1) * Math.PI / 180 * Math.sign(e.deltaY || e.deltaX);
+  const p = viewPt(e), c = Math.cos(step), s = Math.sin(step), dx = rcx - p.x, dy = rcy - p.y;
+  rcx = p.x + dx * c - dy * s;
+  rcy = p.y + dx * s + dy * c;
+  ra += step;
+  placeRuler();
+  return true;
+}
+
+// 획을 시작할 때: 자 가장자리 근처(또는 자 위)에서 시작했으면 가까운 변에 붙임
+function rulerBegin(e) {
+  rulerLock = 0;
+  if (!rulerOn) return;
+  const p = viewPt(e), q = rulerLocal(p.x, p.y);
+  if (Math.abs(q.u) > rulerL / 2 || Math.abs(q.v) > RULER_H / 2 + RULER_SNAP) return;
+  rulerLock = q.v < 0 ? -1 : 1;
+}
+// 화면 좌표를 붙은 변 위로 옮김. 선 굵기 절반만큼 바깥에 그려서 자에 가려지지 않게
+function rulerSnap(x, y, size) {
+  const q = rulerLocal(x, y), v = rulerLock * (RULER_H / 2 + size * scale / 2 + 1);
+  const c = Math.cos(ra), s = Math.sin(ra);
+  return [rcx + q.u * c - v * s, rcy + q.u * s + v * c];
+}
+
+// ---------- 스크롤 / 확대·축소 (손가락 드래그 + 두 손가락 핀치 + 관성) ----------
+const touches = new Map();   // pointerId → { x, y }
+let pan = null, tap = null, pinch = null, inertiaRaf = 0;
+
+function avgPt() {
+  let x = 0, y = 0;
+  for (const p of touches.values()) { x += p.x; y += p.y; }
+  return { x: x / touches.size, y: y / touches.size };
+}
+function spread() {
+  const [a, b] = [...touches.values()];
+  return Math.hypot(a.x - b.x, a.y - b.y) || 1;
+}
+// 손가락 수가 바뀔 때마다 기준점을 새로 잡음
+function resetPan() {
+  const c = avgPt();
+  pan = { x: c.x, y: c.y, t: performance.now(), vel: 0 };
+  if (touches.size === 2) {
+    const r = view.getBoundingClientRect();
+    pinch = { d: spread(), last: null, z: zoom,
+              ax: (c.x - r.left - offsetX) / scale, ay: (c.y - r.top) / scale + scrollY };
+  } else pinch = null;
 }
 
 function startInertia(v) {
@@ -2051,9 +2411,10 @@ view.addEventListener('pointerdown', e => {
   e.preventDefault();
   if (e.pointerId === swallowId) { swallowId = null; return; }
   if (e.pointerType === 'mouse' && e.button !== 0) return;   // 마우스는 왼쪽 버튼만
+  if (rulerDown(e)) return;
   if (!drawing && !erasing) moveCursor(e);
   if (e.pointerType === 'touch') {
-    touches.set(e.pointerId, e.clientY);
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     stopInertia();
     if (tool === 'text') {
       if (touches.size === 1 && !textDrag) startTextDrag(e);
@@ -2061,7 +2422,7 @@ view.addEventListener('pointerdown', e => {
     } else if (fingerMode && touches.size === 1 && !drawing && !erasing) { startInk(e); return; }
     const active = drawing || erasing;
     if (active && touches.has(active.id)) cancelInk();
-    pan = { y: avgY(), t: performance.now(), vel: 0 };
+    resetPan();
     if (touches.size === 2) tap = { t: performance.now(), moved: 0 };
     else if (touches.size > 2) tap = null;
     return;
@@ -2073,13 +2434,20 @@ view.addEventListener('pointerdown', e => {
 view.addEventListener('mousedown', e => e.preventDefault());   // 캔버스를 눌러도 입력창 포커스를 빼앗지 않게
 
 view.addEventListener('pointermove', e => {
+  if (rulerMove(e)) return;
   if (tool === 'text' && !textDrag && e.pointerType === 'mouse') hoverText(e);
   const active = drawing || erasing;
   if (!active || active.id === e.pointerId) moveCursor(e);
   if (active && active.id === e.pointerId) {
+    if (drawing && isShape(drawing)) {             // 도형: 누른 곳부터 지금 위치까지
+      const [x, y] = toDoc(e);
+      drawing.points = shapePoints(drawing.kind, drawing.start, [x, y], e.shiftKey);
+      requestRender();
+      return;
+    }
     const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
     for (const ev of (evs.length ? evs : [e])) {
-      if (drawing) drawing.points.push(toDoc(ev)); else eraseTo(toDoc(ev));
+      if (drawing) drawing.points.push(toDoc(ev, drawing.size)); else eraseTo(toDoc(ev));
     }
     if (drawing) requestRender();
     return;
@@ -2087,23 +2455,31 @@ view.addEventListener('pointermove', e => {
   if (textDrag && textDrag.id === e.pointerId) {
     if (Math.hypot(e.clientX - textDrag.sx, e.clientY - textDrag.sy) > 8) textDrag.moved = true;
     if (textDrag.hit) {                            // 상자·손잡이 위에서 끌면 이동/크기 조절
-      if (touches.has(e.pointerId)) touches.set(e.pointerId, e.clientY);
+      if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (textDrag.moved) dragText(e);
       return;
     }                                              // 빈 곳에서 손가락으로 끌면 아래에서 스크롤
   }
   if (!touches.has(e.pointerId) || !pan) return;
-  touches.set(e.pointerId, e.clientY);
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (drawing || erasing) return;
-  const y = avgY(), now = performance.now();
-  const dy = y - pan.y, dt = now - pan.t;
+  const c = avgPt(), now = performance.now();
+  const dx = c.x - pan.x, dy = c.y - pan.y, dt = now - pan.t;
   if (dt > 0) pan.vel = 0.7 * (dy / dt) + 0.3 * pan.vel;
-  pan.y = y; pan.t = now;
-  if (tap) tap.moved += Math.abs(dy);
-  setScroll(scrollY - dy / scale);
+  pan.x = c.x; pan.y = c.y; pan.t = now;
+  if (pinch) {                                     // 두 손가락: 확대·축소 + 이동
+    const d = spread();
+    if (tap) tap.moved += Math.abs(dx) + Math.abs(dy) + Math.abs(d - (pinch.last ?? pinch.d));
+    pinch.last = d;
+    zoomTo(pinch.z * d / pinch.d, pinch.ax, pinch.ay, c.x, c.y);
+  } else {                                         // 한 손가락(또는 세 손가락): 이동
+    if (tap) tap.moved += Math.abs(dx) + Math.abs(dy);
+    panBy(dx, dy);
+  }
 });
 
 function onEnd(e) {
+  if (rulerUp(e)) return;
   if (textDrag && textDrag.id === e.pointerId) endTextDrag(e.type === 'pointercancel');
   const active = drawing || erasing;
   if (active && active.id === e.pointerId) finishInk();
@@ -2111,22 +2487,28 @@ function onEnd(e) {
   touches.delete(e.pointerId);
   const now = performance.now();
   if (touches.size > 0) {
-    if (pan) { pan.y = avgY(); pan.t = now; }
+    const hadPinch = !!pinch;
+    resetPan();
+    if (hadPinch) pan.noFling = true;              // 핀치 직후에는 관성 스크롤 안 함
     return;
   }
   if (tap && tap.moved < 10 && now - tap.t < 300) undo();
-  else if (pan && now - pan.t < 80) startInertia(pan.vel);
-  pan = null; tap = null;
+  else if (pan && !pan.noFling && now - pan.t < 80) startInertia(pan.vel);
+  pan = null; tap = null; pinch = null;
 }
 view.addEventListener('pointerup', onEnd);
 view.addEventListener('pointercancel', e => { eCursor.hidden = true; onEnd(e); });
 view.addEventListener('pointerleave', () => { eCursor.hidden = true; });
 view.addEventListener('contextmenu', e => e.preventDefault());   // 안드로이드 길게 누르기 메뉴·우클릭 메뉴 막기
 
+// PC: 휠 = 위아래, Shift+휠 = 좌우, Ctrl+휠(트랙패드 핀치) = 확대·축소, 자 위에서 휠 = 자 회전
 view.addEventListener('wheel', e => {
   e.preventDefault();
   stopInertia();
-  setScroll(scrollY + e.deltaY / scale);
+  if (!e.ctrlKey && !e.metaKey && rulerWheel(e)) return;
+  if (e.ctrlKey || e.metaKey) { zoomAt(zoom * Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY); return; }
+  const sideways = e.shiftKey && !e.deltaX;
+  panBy(-(sideways ? e.deltaY : e.deltaX), -(sideways ? 0 : e.deltaY));
 }, { passive: false });
 
 ['gesturestart', 'gesturechange', 'dblclick'].forEach(t =>
@@ -2135,7 +2517,7 @@ document.addEventListener('touchmove', e => {
   if (!editor.hidden && !e.target.closest('input, textarea')) e.preventDefault();
 }, { passive: false });
 
-// PC 키보드 단축키: Ctrl(Cmd)+Z 실행취소, Ctrl+Shift+Z 또는 Ctrl+Y 다시실행
+// PC 키보드 단축키: Ctrl(Cmd)+Z 실행취소, Ctrl+Shift+Z 또는 Ctrl+Y 다시실행, Ctrl +/-/0 확대·축소
 // 텍스트 상자 선택 중: Delete/Backspace 삭제, Enter 편집, Esc 해제, Ctrl+D 복제
 document.addEventListener('keydown', e => {
   if (editor.hidden || !modal.hidden) return;
@@ -2150,11 +2532,14 @@ document.addEventListener('keydown', e => {
   }
   if (!(e.ctrlKey || e.metaKey)) return;
   const k = e.key.toLowerCase();
+  if (k === '=' || k === '+') { e.preventDefault(); return zoomCenter(zoom * 1.25); }
+  if (k === '-') { e.preventDefault(); return zoomCenter(zoom / 1.25); }
+  if (k === '0') { e.preventDefault(); return zoomCenter(1); }
   if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
   else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); }
 });
 
-// ---------- 도구 / 펜 종류 / 지우개 모드 / 굵기 ----------
+// ---------- 도구 / 펜 종류 / 지우개 모드 / 도형 / 굵기 ----------
 const sizeInput = $('size'), sizeLabel = $('sizeLabel'), dot = $('dot');
 
 function setTool(name) {
@@ -2167,9 +2552,10 @@ function setTool(name) {
   }
   penBtn.classList.toggle('active', isPen(name));
   eraserBtn.classList.toggle('active', name === 'eraser');
+  shapeBtn.classList.toggle('active', name === 'shape');
   document.querySelectorAll('[data-tool]').forEach(x => x.classList.toggle('active', x.dataset.tool === name));
   if (name !== 'eraser') eCursor.hidden = true;
-  view.style.cursor = name === 'text' ? 'text' : '';
+  view.style.cursor = name === 'text' ? 'text' : name === 'shape' ? 'crosshair' : '';
   updateSizeUI();
 }
 
@@ -2179,13 +2565,19 @@ function setEraserMode(m) {
   eraserBtn.textContent = ERASER_MODES[m].label + ' ▾';
 }
 
+function setShapeKind(k) {
+  shapeKind = k;
+  localStorage.setItem(SHAPE_KEY, k);
+  shapeBtn.textContent = SHAPES[k].label + ' ▾';
+}
+
 function updateSizeUI() {
-  const T = TOOLS[tool], txt = tool === 'text';
-  const [min, max] = T ? T.range : txt ? TEXT_RANGE : ERASER_RANGE;
+  const T = TOOLS[tool], txt = tool === 'text', shp = tool === 'shape';
+  const [min, max] = T ? T.range : txt ? TEXT_RANGE : shp ? SHAPE_RANGE : ERASER_RANGE;
   if (!T) sizes[tool] = Math.min(max, Math.max(min, sizes[tool] || min));
   sizeInput.min = min; sizeInput.max = max; sizeInput.value = sizes[tool];
   sizeLabel.textContent = sizes[tool];
-  const d = Math.min(30, Math.max(3, sizes[tool] * (T ? T.dot : txt ? 0.45 : 0.4)));
+  const d = Math.min(30, Math.max(3, sizes[tool] * (T ? T.dot : txt ? 0.45 : shp ? 1.3 : 0.4)));
   dot.style.width = dot.style.height = d + 'px';
   if (tool === 'eraser') {
     dot.style.background = '#fff'; dot.style.border = '2px solid #999'; dot.style.opacity = 1;
@@ -2217,6 +2609,17 @@ function penPreview(kind) {
     pts.push([6 + t * 52, 12 + Math.sin(t * Math.PI * 2) * 5, 0.25 + 0.6 * Math.sin(t * Math.PI)]);
   }
   drawStroke(ctx, { tool: kind, color: '#1c1c1e', size: Math.min(TOOLS[kind].size, 7), points: pts, simulate: false });
+  return c;
+}
+
+function shapePreview(kind) {
+  const c = document.createElement('canvas');
+  const k = window.devicePixelRatio || 2;
+  c.width = 64 * k; c.height = 24 * k;
+  const ctx = c.getContext('2d');
+  ctx.scale(k, k);
+  const pts = kind === 'line' ? [[10, 20], [54, 4]] : shapePoints(kind, [22, 2], [42, 22], false);
+  drawShape(ctx, { type: 'shape', color: '#1c1c1e', size: 2, points: pts });
   return c;
 }
 
@@ -2269,21 +2672,42 @@ function openEraserMenu() {
   placeMenu(eraserMenu, eraserBtn);
 }
 
+let shapeMenuBuilt = false;
+function openShapeMenu() {
+  if (!shapeMenuBuilt) {
+    for (const [k, s] of Object.entries(SHAPES)) {
+      const b = menuItem(s.label, s.desc, shapePreview(k));
+      b.dataset.shape = k;
+      b.onclick = () => { setShapeKind(k); setTool('shape'); shapeMenu.hidden = true; };
+      shapeMenu.appendChild(b);
+    }
+    shapeMenuBuilt = true;
+  }
+  shapeMenu.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.shape === shapeKind));
+  placeMenu(shapeMenu, shapeBtn);
+}
+
 // 선택된 상태에서 한 번 더 누르면 종류 메뉴, 아니면 그 도구로 전환
 penBtn.onclick = () => {
-  eraserMenu.hidden = true;
+  eraserMenu.hidden = shapeMenu.hidden = true;
   if (!penMenu.hidden) penMenu.hidden = true;
   else if (isPen(tool)) openPenMenu();
   else setTool(lastPen);
 };
 eraserBtn.onclick = () => {
-  penMenu.hidden = true;
+  penMenu.hidden = shapeMenu.hidden = true;
   if (!eraserMenu.hidden) eraserMenu.hidden = true;
   else if (tool === 'eraser') openEraserMenu();
   else setTool('eraser');
 };
+shapeBtn.onclick = () => {
+  penMenu.hidden = eraserMenu.hidden = true;
+  if (!shapeMenu.hidden) shapeMenu.hidden = true;
+  else if (tool === 'shape') openShapeMenu();
+  else setTool('shape');
+};
 document.addEventListener('pointerdown', e => {
-  for (const [m, b] of [[penMenu, penBtn], [eraserMenu, eraserBtn]]) {
+  for (const [m, b] of [[penMenu, penBtn], [eraserMenu, eraserBtn], [shapeMenu, shapeBtn]]) {
     if (!m.hidden && !m.contains(e.target) && !b.contains(e.target)) m.hidden = true;
   }
 }, true);
@@ -2427,7 +2851,7 @@ $('clear').onclick = async () => {
 
 // ---------- 시작 ----------
 window.addEventListener('resize', () => {
-  penMenu.hidden = eraserMenu.hidden = true;
+  penMenu.hidden = eraserMenu.hidden = shapeMenu.hidden = true;
   resize();
   if (textEdit) {   // 키보드가 올라와 화면이 줄어들면 입력 중인 상자가 보이도록 스크롤
     const y = (textEdit.cur.y - scrollY) * scale;
@@ -2436,6 +2860,7 @@ window.addEventListener('resize', () => {
 });
 renderPalette();
 setEraserMode(eraserMode);
+setShapeKind(shapeKind);
 setTool(tool);
 
 (async () => {
