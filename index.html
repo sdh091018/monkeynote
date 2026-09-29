@@ -304,7 +304,7 @@
 
 <script type="module">
 // ===== 버전: 올릴 때마다 바꾸세요 (version.json을 쓰면 그 숫자와 똑같이) =====
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.10.1';
 // ========================================================================
 
 import { getStroke } from 'https://esm.sh/perfect-freehand@1';
@@ -2881,6 +2881,21 @@ setTool(tool);
   }
   checkForUpdate();
 })();
+ // v1.10.1 필기 떨림 보정
+const inkDone = new WeakMap();
+view.addEventListener('pointermove', e => {
+  if (!drawing || isShape(drawing) || drawing.id !== e.pointerId) return;
+  const pts = drawing.points;
+  let w = inkDone.get(drawing) || 1;
+  for (let r = w; r < pts.length; r++) {
+    const pt = pts[r], last = pts[w - 1];
+    if (Math.hypot(pt[0] - last[0], pt[1] - last[1]) < 1 / scale) continue;   // 1픽셀 미만 떨림 무시
+    pt[2] = Math.round((last[2] * 0.7 + pt[2] * 0.3) * 100) / 100;          // 필압 부드럽게
+    pts[w++] = pt;
+  }
+  pts.length = w;
+  inkDone.set(drawing, w);
+});
 </script>
 </body>
 </html>
