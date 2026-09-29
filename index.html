@@ -390,18 +390,19 @@ const bctx = base.getContext('2d'), lctx = live.getContext('2d');
 // 'pen'(볼펜)과 'highlighter'는 예전 노트와 호환되도록 이름·설정을 그대로 둠
 const TOOLS = {
   pen:         { label: '볼펜',   desc: '기본 펜',                 size: 5,  range: [1, 20], dot: 1.3, alpha: 1,
-                 thinning: 0.6,  smoothing: 0.5, streamline: 0.4 },
+                 thinning: 0.6,  smoothing: 0.25, streamline: 0.2, start: { taper: 4 }, end: { taper: 8 } },
   fountain:    { label: '만년필', desc: '누르는 힘에 따라 굵기 변화', size: 6,  range: [2, 24], dot: 1.1, alpha: 1,
-                 thinning: 0.85, smoothing: 0.6, streamline: 0.5, end: { taper: 24 } },
+                 thinning: 0.85, smoothing: 0.3,  streamline: 0.25, end: { taper: 24 } },
   pencil:      { label: '연필',   desc: '종이 결 느낌',             size: 3,  range: [1, 12], dot: 1.6, alpha: 0.85, grain: true,
-                 thinning: 0.3,  smoothing: 0.4, streamline: 0.35 },
+                 thinning: 0.45, smoothing: 0.2,  streamline: 0.15 },
   brush:       { label: '붓펜',   desc: '뾰족한 시작과 끝',          size: 12, range: [3, 40], dot: 0.7, alpha: 1,
-                 thinning: 0.95, smoothing: 0.7, streamline: 0.55, start: { taper: 16 }, end: { taper: 36 } },
+                 thinning: 0.95, smoothing: 0.4,  streamline: 0.3, start: { taper: 16 }, end: { taper: 36 } },
   marker:      { label: '마커',   desc: '진하고 일정한 굵기',        size: 8,  range: [3, 30], dot: 0.9, alpha: 1,
-                 thinning: 0,    smoothing: 0.5, streamline: 0.5 },
+                 thinning: 0,    smoothing: 0.3,  streamline: 0.25 },
   highlighter: { label: '형광펜', desc: '',                        size: 22, range: [8, 50], dot: 0.6, alpha: 0.35,
-                 thinning: 0,    smoothing: 0.5, streamline: 0.5 },
+                 thinning: 0,    smoothing: 0.5,  streamline: 0.5 },
 };
+
 const PEN_KINDS = ['pen', 'fountain', 'pencil', 'brush', 'marker'];
 const ERASER_RANGE = [5, 80];
 const ERASER_MODES = {
